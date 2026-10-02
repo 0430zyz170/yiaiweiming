@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>以爱为名 · 张泽禹</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #080b09;
+      color: #e8ede8;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    #bgCanvas {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .game-container {
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      max-width: 520px;
+      min-height: 600px;
+      max-height: 94vh;
+      padding: 22px 18px 16px;
+      display: flex;
+      flex-direction: column;
+      background: rgba(8, 16, 12, 0.78);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 28px;
+      border: 1px solid rgba(76, 175, 80, 0.12);
+      box-shadow:
+        0 0 80px rgba(76, 175, 80, 0.05),
+        0 24px 64px rgba(0, 0, 0, 0.7),
+        inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      margin: 16px;
+      animation: fadeUp 0.8s ease-out;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .ambient-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2px 14px;
+      border-bottom: 1px solid rgba(76, 175, 80, 0.08);
+    }
+
+    .ambient-bar .left {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .pulse-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #4caf50;
+      box-shadow: 0 0 10px #4caf50;
+      animation: pulse 2.4s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.3; transform: scale(0.6); }
+    }
+
+    .ambient-bar .label {
+      font-size: 10px;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: rgba(232, 237, 232, 0.35);
+      font-weight: 600;
+    }
+
+    .ambient-bar .chapter-tag {
+      font-size: 10px;
+      color: rgba(129, 199, 132, 0.5);
+      letter-spacing: 1px;
+      font-weight: 500;
+    }
+
+    .progress-track {
+      display: flex;
+      gap: 4px;
+      padding: 14px 2px 6px;
+    }
+
+    .progress-track .seg {
+      flex: 1;
+      height: 2px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.05);
+      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .progress-track .seg.active {
+      background: rgba(76, 175, 80, 0.25);
+    }
+
+    .progress-track .seg.active::after {
+      content: '';
+      display: block;
+      height: 100%;
+      border-radius: 2px;
+      background: linear-gradient(90deg, #4caf50, #81c784);
+      animation: fillIn 0.5s ease-out forwards;
+    }
+
+    @keyframes fillIn {
+      from { width: 0%; }
+      to { width: 100%; }
+    }
+
+    .progress-track .seg.done {
+      background: linear-gradient(90deg, #4caf50, #66bb6a);
+    }
+
+    .content-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 10px 2px;
+      overflow-y: auto;
+      scrollbar-width: none;
+    }
+    .content-area::-webkit-scrollbar { display: none; }
+
+    .scene-title {
+      font-size: 11px;
+      letter-spacing: 3px;
+      color: rgba(76, 175, 80, 0.65);
+      text-transform: uppercase;
+      margin-bottom: 16px;
+      font-weight: 600;
+    }
+
+    .main-text {
+      font-size: 15px;
+      line-height: 1.95;
+      color: #d4ded4;
+      margin-bottom: 6px;
+      font-weight: 400;
+      letter-spacing: 0.3px;
+      min-height: 140px;
+    }
+
+    .main-text .em { color: #81c784; font-weight: 500; }
+    .main-text .soft { color: rgba(212, 222, 212, 0.55); font-style: italic; }
+    .main-text .highlight { color: #a5d6a7; font-weight: 600; }
+    .main-text .dim { color: rgba(212, 222, 212, 0.4); }
+
+    .choices {
+      margin-top: auto;
+      padding-top: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .choice-btn {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      padding: 15px 16px;
+      border-radius: 16px;
+      border: 1px solid rgba(76, 175, 80, 0.1);
+      background: rgba(255, 255, 255, 0.018);
+      color: #d4ded4;
+      font-size: 14.5px;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      text-align: left;
+      font-family: inherit;
+      line-height: 1.5;
+      width: 100%;
+    }
+
+    .choice-btn:hover {
+      border-color: rgba(76, 175, 80, 0.3);
+      background: rgba(76, 175, 80, 0.05);
+      transform: translateX(3px);
+    }
+
+    .choice-btn:active { transform: scale(0.98); }
+
+    .choice-btn .icon {
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      background: rgba(76, 175, 80, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      flex-shrink: 0;
+      color: #81c784;
+    }
+
+    .choice-btn .text { flex: 1; }
+
+    .ending-card {
+      text-align: center;
+      padding: 32px 16px;
+      animation: fadeUp 0.6s ease-out;
+    }
+
+    .ending-card .badge {
+      display: inline-block;
+      padding: 5px 16px;
+      border-radius: 20px;
+      border: 1px solid rgba(76, 175, 80, 0.25);
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: #81c784;
+      margin-bottom: 20px;
+      text-transform: uppercase;
+    }
+
+    .ending-card h2 {
+      font-size: 19px;
+      font-weight: 500;
+      color: #e8ede8;
+      margin-bottom: 14px;
+      line-height: 1.5;
+    }
+
+    .ending-card p {
+      font-size: 13px;
+      line-height: 1.9;
+      color: rgba(212, 222, 212, 0.65);
+      margin-bottom: 10px;
+    }
+
+    .ending-card .quote {
+      margin-top: 22px;
+      padding: 14px 18px;
+      border-left: 2px solid rgba(76, 175, 80, 0.25);
+      text-align: left;
+      font-size: 12px;
+      color: rgba(129, 199, 132, 0.75);
+      line-height: 1.8;
+      font-style: italic;
+      background: rgba(76, 175, 80, 0.02);
+      border-radius: 0 10px 10px 0;
+    }
+
+    .restart-btn {
+      margin-top: 24px;
+      padding: 13px 36px;
+      border-radius: 30px;
+      border: 1px solid rgba(76, 175, 80, 0.25);
+      background: transparent;
+      color: #81c784;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-family: inherit;
+      letter-spacing: 1px;
+    }
+
+    .restart-btn:hover {
+      background: rgba(76, 175, 80, 0.08);
+      border-color: rgba(76, 175, 80, 0.45);
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 2px; height: 1em;
+      background: #81c784;
+      margin-left: 2px;
+      vertical-align: text-bottom;
+      animation: blink 1s step-end infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    .footer-note {
+      text-align: center;
+      padding-top: 10px;
+      font-size: 9px;
+      letter-spacing: 2.5px;
+      color: rgba(232, 237, 232, 0.12);
+      text-transform: uppercase;
+    }
+
+    @media (max-width: 480px) {
+      .game-container {
+        margin: 8px;
+        padding: 16px 12px 12px;
+        min-height: 520px;
+        border-radius: 22px;
+        max-height: 98vh;
+      }
+      .main-text { font-size: 14px; line-height: 1.9; min-height: 120px; }
+      .choice-btn { padding: 13px 13px; font-size: 13.5px; gap: 10px; }
+      .choice-btn .icon { width: 24px; height: 24px; font-size: 11px; }
+      .scene-title { font-size: 10px; margin-bottom: 12px; }
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="bgCanvas"></canvas>
+
+  <div class="game-container">
+    <div class="ambient-bar">
+      <div class="left">
+        <div class="pulse-dot"></div>
+        <span class="label">以爱为名</span>
+      </div>
+      <span class="chapter-tag" id="chapterTag">序章</span>
+    </div>
+
+    <div class="progress-track" id="progressTrack">
+      <div class="seg" data-idx="0"></div>
+      <div class="seg" data-idx="1"></div>
+      <div class="seg" data-idx="2"></div>
+      <div class="seg" data-idx="3"></div>
+      <div class="seg" data-idx="4"></div>
+      <div class="seg" data-idx="5"></div>
+      <div class="seg" data-idx="6"></div>
+      <div class="seg" data-idx="7"></div>
+    </div>
+
+    <div class="content-area" id="contentArea"></div>
+
+    <div class="footer-note">小禹宙 · 雪的背面是春天</div>
+  </div>
+
+  <script>
+    // ============================================
+    // 背景粒子
+    // ============================================
+    (function initParticles() {
+      const canvas = document.getElementById('bgCanvas');
+      const ctx = canvas.getContext('2d');
+      let W, H;
+      const particles = [];
+      const COUNT = 50;
+
+      function resize() {
+        W = canvas.width = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+      }
+
+      class Particle {
+        constructor() { this.reset(); }
+        reset() {
+          this.x = Math.random() * W;
+          this.y = Math.random() * H;
+          this.size = Math.random() * 1.6 + 0.3;
+          this.speedX = (Math.random() - 0.5) * 0.2;
+          this.speedY = (Math.random() - 0.5) * 0.2 - 0.1;
+          this.opacity = Math.random() * 0.35 + 0.06;
+          this.fade = Math.random() * 0.003 + 0.001;
+        }
+        update() {
+          this.x += this.speedX;
+          this.y += this.speedY;
+          this.opacity -= this.fade;
+          if (this.opacity <= 0 || this.y < -10 || this.x < -10 || this.x > W + 10) {
+            this.reset();
+            this.y = H + 10;
+          }
+        }
+        draw() {
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(129, 199, 132, ${this.opacity})`;
+          ctx.fill();
+        }
+      }
+
+      function init() {
+        resize();
+        for (let i = 0; i < COUNT; i++) particles.push(new Particle());
+        animate();
+      }
+
+      function animate() {
+        ctx.clearRect(0, 0, W, H);
+        particles.forEach(p => { p.update(); p.draw(); });
+        requestAnimationFrame(animate);
+      }
+
+      window.addEventListener('resize', resize);
+      init();
+    })();
+
+    // ============================================
+    // 游戏数据 — 张泽禹个人完整经历
+    // ============================================
+    const GAME_DATA = {
+      scenes: {
+        // ===== 序章 =====
+        start: {
+          id: 'start',
+          title: '序章 · 哈尔滨的孩子',
+          chapter: '2007 — 2017',
+          text: `2007年4月30日。哈尔滨。\n\n一个男孩出生了。没有人知道，十八年后，他会站在万人舞台上，被绿色的光海包围。\n\n你叫张泽禹。小时候你是个安静的孩子，喜欢唱歌，喜欢吉他。十岁那年，你参加了《音乐大师课第三季》，为听力不好的太爷爷传话，唱了一首《我是一个兵》。[citation:1]\n\n<span class="soft">那是你第一次站在聚光灯下。也是你第一次发现，原来唱歌可以让别人露出那样的表情。</span>\n\n后来你去学了电吉他。认识了一群小伙伴，在哈尔滨组了个乐队，搞摇滚。\n\n<span class="em">“最开始学的电吉他，后来就喜欢上了。”</span>\n\n那时候你大概不知道，这把吉他后来会跟着你走很远。`,
+          choices: [
+            { text: '想起第一次拿起吉他的感觉', next: 'scene_guitar', icon: '♪' },
+            { text: '想起太爷爷听你唱歌的样子', next: 'scene_grandpa', icon: '·' },
+          ]
+        },
+
+        scene_guitar: {
+          id: 'scene_guitar',
+          title: '第一章 · 摇滚的种子',
+          chapter: '哈尔滨 · 少年',
+          text: `你想起梁博。\n\n小学的时候，你看了《中国好声音》第一季。一个男生抱着一把吉他，安安静静地唱歌。你觉得，好帅。\n\n然后你去学了电吉他。你后来在采访里说：“最开始学的电吉他，后来就喜欢上了。”[citation:7]\n\n<span class="soft">你还在练林肯公园的《New Divide》。声乐课的时候自己挑的。</span>\n\n你一直知道自己要什么。\n\n2017年，你参加了《音乐大师课第三季》。站在舞台上的时候，你没有紧张。你只是觉得，唱歌这件事，你好像可以一直做下去。\n\n<span class="em">那一年你十岁。</span>`,
+          choices: [
+            { text: '带着吉他走向更大的舞台', next: 'scene_join_tf', icon: '→' },
+          ]
+        },
+
+        scene_grandpa: {
+          id: 'scene_grandpa',
+          title: '第一章 · 太爷爷',
+          chapter: '哈尔滨 · 童年',
+          text: `你想起太爷爷。\n\n他的听力不太好。你站在他面前，大声地、认真地唱歌。他听不清旋律，但他看着你的嘴巴一张一合，看着你眼里的光。\n\n然后他笑了。\n\n<span class="soft">那是你第一次意识到，唱歌不只是唱给自己听的。</span>\n\n后来你参加了《音乐大师课第三季》。你在舞台上为太爷爷唱了一首《我是一个兵》。[citation:1]\n\n你站在聚光灯下，想起了太爷爷的笑容。\n\n<span class="em">你想让更多人听到你的声音。</span>`,
+          choices: [
+            { text: '带着这份初心继续走', next: 'scene_join_tf', icon: '→' },
+          ]
+        },
+
+        scene_join_tf: {
+          id: 'scene_join_tf',
+          title: '第二章 · 三千公里',
+          chapter: '2018 · 重庆',
+          text: `2018年。你加入了TF家族。[citation:1]\n\n从哈尔滨到重庆，三千公里。\n\n你成了三代练习生里最远离家的那个孩子。\n\n重庆的训练营很大，人很多。你坐在最角落的位置，够不到桌子中间的菜。于是你拿起一包奥利奥，掰碎了拌进白米饭里。[citation:2]\n\n<span class="soft">没有人发现。你也没有说。</span>\n\n你一直都是这样。发烧的时候，父母不在身边，你自己哄自己把药喝了，然后继续上台顶高音。蹭课的时候被赶出教室，你也是笑眯眯的。\n\n有人后来说，你好像永远不会难过。\n\n<span class="em">但你记得。你只是选择把那些东西藏起来。</span>`,
+          choices: [
+            { text: '把孤独写成旋律', next: 'scene_dttm', icon: '♪' },
+            { text: '继续做一个笑眯眯的人', next: 'scene_smile', icon: '·' },
+          ]
+        },
+
+        scene_dttm: {
+          id: 'scene_dttm',
+          title: '第三章 · DTTM',
+          chapter: '2022 · 十五岁',
+          text: `2022年6月17日。你的第一支原创单曲《DTTM》上线了。[citation:6]\n\n那时候你十五岁。\n\n你写歌的方式一直很笨——想到什么就记在手机备忘录里，然后慢慢拼。\n\n《DTTM》是一首“快乐之歌”。它的灵感来自“就地取材的想象”——从枯燥的日常房间，飞跃到自由月球的旅程。\n\n<span class="em">“Breaking the window / Dancing to the moon”</span>\n\n你想象自己在一间屋子里跳舞，high到月球上。没有重力，自由的感觉。[citation:6]\n\n编曲是芬兰音乐人做的。但你写词曲的时候，只是在想：如果不用写作业，如果能飞走，该多好。\n\n<span class="soft">这是一个十五岁孩子最朴素的愿望。</span>`,
+          choices: [
+            { text: '继续写下去', next: 'scene_graduation', icon: '→' },
+          ]
+        },
+
+        scene_smile: {
+          id: 'scene_smile',
+          title: '第三章 · 想见你的倒计时',
+          chapter: '2020 · 十三岁',
+          text: `你想起“想见你的倒计时”。\n\n那是你为数不多在镜头前掉眼泪的时刻。[citation:2]\n\n考核的时候，你被老师单独拎出来批评。你明明做得不差，但不知道为什么，只有你被点名了。\n\n老师说，对你期望很高。\n\n你蔫了。但你努力笑了。\n\n后来要选人出去。有人提议把你裁掉。你眼泪汪汪地说想要争取。\n\n<span class="soft">“我练到凌晨一点。”</span>\n\n你不会说“我运气不好”，不会说自己状态不好、心态不好。你只会把所有的失败归结于不够努力。[citation:2]\n\n有人后来说你“碎掉了”。\n\n<span class="em">但你把自己拼回来了。</span>`,
+          choices: [
+            { text: '把委屈咽下去，继续走', next: 'scene_dttm', icon: '→' },
+          ]
+        },
+
+        scene_graduation: {
+          id: 'scene_graduation',
+          title: '第四章 · 毕业',
+          chapter: '2022 · 第二首原创',
+          text: `《毕业》来了。\n\n你写的是你自己。从哈尔滨到重庆，从练习生到艺人，每一次“毕业”都是一次告别。\n\n你记得那些没去的韩国行。没去的快乐大本营。没上的直播。2秒镜头。[citation:11]\n\n你记得为了队友放弃的舞台。记得耳返被偷了，你依然完成了表演。\n\n<span class="soft">你记得很多事。你只是不说。</span>\n\n有人问你，音乐理想是什么。\n\n你想了想，说：攀岩。\n\n<span class="em">“还在向上攀登。攀登的目标就是坚定自己，然后做更好的音乐给大家。”</span>`,
+          choices: [
+            { text: '开始攀岩', next: 'scene_climb', icon: '↑' },
+            { text: '继续在舞台上前行', next: 'scene_sports', icon: '→' },
+          ]
+        },
+
+        // ===== 攀岩线 =====
+        scene_climb: {
+          id: 'scene_climb',
+          title: '第五章 · 抱石',
+          chapter: '2026 · 十九岁',
+          text: `你最近在学攀岩。\n\n你有恐高。但你还是去了。[citation:7]\n\n你爬的是抱石——相对矮的那种，不需要绳子，下面有垫子。但每一次伸手，每一次换脚，都需要百分之百的专注。\n\n<span class="em">“你把这一条线路给过关的那种感觉，很爽。”</span>[citation:7]\n\n攀岩可以一个人随时去。有很强的即时反馈。登顶之后立刻收获满满的快乐。所以你初次尝试后就上瘾了。[citation:17]\n\n你想起了很多事。\n\n被砍掉的舞台。没去成的音综。深夜想买机票回家的冲动。\n\n<span class="soft">但攀岩的人不会往下看。他们只看下一个点。</span>`,
+          choices: [
+            { text: '继续向上，看下一个点', next: 'scene_sports', icon: '↑' },
+          ]
+        },
+
+        // ===== 运动会线 =====
+        scene_sports: {
+          id: 'scene_sports',
+          title: '第五章 · 泡沫摔跤',
+          chapter: '2026 · 运动会',
+          text: `运动会的时候，你是队长。\n\n泡沫摔跤环节。场地铺满白色泡沫颗粒，底下是缓冲垫。泡沫很滑，场面混乱失控。[citation:3]\n\n对抗拉扯中，你失去重心。整个人后背和头部重重砸向垫子。落地撞击的声响，直播收音清清楚楚。\n\n你躺在地上，停顿了好几秒。\n\n然后你慢慢缓过来。坚持起身，继续完成比赛。[citation:3]\n\n<span class="soft">粉丝心疼得要命，冲上了热搜。</span>\n\n但你后来提起这件事的时候，还是笑眯眯的。当晚你发微博：“运动会第一天结束了！稍有遗憾哈哈哈 明天见！”[citation:12]\n\n<span class="em">“我这人就是不太多想，怕自己太内耗。遇到不好的事情，过段时间也就不记得了。”</span>`,
+          choices: [
+            { text: '继续做那个笑眯眯的人', next: 'scene_singing_teacher', icon: '·' },
+            { text: '把这种隐忍写进歌里', next: 'scene_singing_teacher', icon: '♪' },
+          ]
+        },
+
+        // ===== 声乐老师线 =====
+        scene_singing_teacher: {
+          id: 'scene_singing_teacher',
+          title: '第六章 · 声乐课',
+          chapter: '2026 · 练习室',
+          text: `声乐课。\n\n老师让你唱一段高音。你唱了。老师又让你唱一段低音。你唱了。\n\n然后老师说：“低音不是很好。要多练。”\n\n你点头。你一直知道自己的短板在哪里。老师说你高音爆发力强，低音需要加强。你记在心里。[citation:2]\n\n但你知道，你练得一点都不少。\n\n<span class="soft">有人看到过你练到凌晨一点。</span>\n\n你不会说“我运气不好”。不会说我状态不好。不会说不舒服。\n\n你只会把所有的失败归结于不够努力。\n\n<span class="em">然后继续练。</span>`,
+          choices: [
+            { text: '继续练习，直到满意', next: 'scene_bracelet', icon: '♪' },
+          ]
+        },
+
+        // ===== 腕带事件 =====
+        scene_bracelet: {
+          id: 'scene_bracelet',
+          title: '第七章 · 腕带',
+          chapter: '2026 · TMEA',
+          text: `TMEA的舞台上，你手腕上的绑带一直在滑。\n\n调整了几次，还是不稳。轮到你的part之前，你做了一个决定：把它扔了。\n\n<span class="em">动作干净利落。节奏没有乱一秒。</span>\n\n演出结束，你下场前弯腰把它捡了起来，带走了。[citation:5]\n\n你一直是这样的人。\n\n不慌，不乱。出了问题就解决，解决完了还记得收尾。\n\n有人后来说这是“神级处理”。但对你来说，这只是本能。\n\n<span class="soft">从十岁站在舞台上开始，你就知道：舞台不等人。你只能把每一个当下都接住。</span>`,
+          choices: [
+            { text: '走向青岛', next: 'scene_qingdao', icon: '→' },
+          ]
+        },
+
+        // ===== 青岛演唱会 =====
+        scene_qingdao: {
+          id: 'scene_qingdao',
+          title: '第八章 · 零失误',
+          chapter: '2026.7 · 青岛',
+          text: `2026年7月。青岛。演唱会第四天。\n\n你站在舞台上，完成了一个又一个高难度的表演。全开麦，零失误。你还临时学会了唢呐，在《象人》里吹了出来。[citation:4]\n\n但两个精心排练的三人舞台，在彩排后被取消了。\n\n你是全团唯一实质性失去舞台的人。[citation:4]\n\n然后你站在talking环节，对着台下说：\n\n<span class="em">“舞台对我们来说很重要……希望大家可以一起珍惜舞台。”</span>\n\n你道歉了。\n\n<span class="soft">明明最委屈的是你。明明你零失误。明明被砍掉舞台的是你。</span>\n\n粉丝在热搜下面刷屏：“张泽禹做错了零件事。”[citation:4]\n\n但你只是站在那里，真诚地、体面地，把话说完。\n\n<span class="dim">后来你在微博发了一篇长文，专门呼吁粉丝“不要打架、不要互相谩骂”，还强调“大家平安开心，我站在这里才有意义”。[citation:4]</span>`,
+          choices: [
+            { text: '继续做一个体面的人', next: 'scene_ending', icon: '·' },
+            { text: '在心里允许自己委屈一下', next: 'scene_ending', icon: '·' },
+          ]
+        },
+
+        // ===== 结局 =====
+        scene_ending: {
+          id: 'scene_ending',
+          title: '终章 · 雪的背面',
+          chapter: 'NOW',
+          text: `2026年。你十九岁。\n\n从哈尔滨的雪，到重庆的训练室，到北京的公司，到无数个舞台。\n\n你记得奥利奥拌饭。记得蹭课被赶出去。记得深夜想买机票回家的冲动。记得泡沫摔跤那一瞬间的闷响。记得被砍掉的舞台。记得站在台上道歉时，台下那片绿光。\n\n<span class="soft">“雪的背面是春天。”</span>\n\n这句话是你写的。\n\n你是在哈尔滨长大的孩子，你知道雪有多厚，也知道雪化的时候是什么样子。那些被埋起来的，被冻住的，被覆盖的——都会在某个时刻，变成水流出来。\n\n你还是那个不太会表达的人。你只是把所有东西都写进了歌里。\n\n<span class="em">以爱为名。从来不是一句口号。</span>\n\n是你一个人走了很远的路，然后发现——\n\n回头看的时候，雪已经化了。`,
+          choices: [
+            { text: '完成这场旅程', next: 'ending', icon: '✓' },
+          ]
+        },
+
+        ending: {
+          id: 'ending',
+          title: '小禹宙',
+          chapter: 'END',
+          ending: true,
+          text: `你叫张泽禹。\n\n2007年生于哈尔滨。十岁登上《音乐大师课》。十三岁加入TF家族。十五岁写出第一首原创《DTTM》。十七岁写出《毕业》。十八岁学会唢呐。十九岁，还在攀岩。\n\n你不太会表达，但你记得所有事。\n\n你是那个蹭课被赶出教室还笑眯眯的孩子。是那个发烧了自己哄自己喝药的人。是那个在泡沫摔跤后坚持完成比赛的人。是那个腕带滑了就扔、下场记得捡的人。是那个被砍了舞台还代表团队道歉的人。\n\n<span class="em">你是张泽禹。</span>\n\n从十岁到十九岁，九年。你一直在做同一件事。\n\n唱歌。\n\n<b>“雪的背面是春天。”</b>\n\n<span class="dim">Where the snow melts is where my story begins.</span>`,
+          quote: '“我把所有的失败归结于不够努力。然后继续练。”',
+        }
+      }
+    };
+
+    // ============================================
+    // 引擎
+    // ============================================
+    const state = { currentScene: 'start' };
+
+    const contentArea = document.getElementById('contentArea');
+    const progressSegs = document.querySelectorAll('.progress-track .seg');
+    const chapterTag = document.getElementById('chapterTag');
+
+    // 场景顺序与进度映射
+    const SCENE_ORDER = [
+      'start', 'scene_guitar', 'scene_grandpa', 'scene_join_tf',
+      'scene_dttm', 'scene_smile', 'scene_graduation', 'scene_climb',
+      'scene_sports', 'scene_singing_teacher', 'scene_bracelet',
+      'scene_qingdao', 'scene_ending', 'ending'
+    ];
+    const PROGRESS_MAP = [0, 0, 0, 1, 2, 2, 3, 4, 5, 5, 6, 7, 7, 7];
+
+    function updateProgress() {
+      const idx = SCENE_ORDER.indexOf(state.currentScene);
+      const p = PROGRESS_MAP[idx] ?? 0;
+      progressSegs.forEach((seg, i) => {
+        seg.classList.remove('active', 'done');
+        if (i < p) seg.classList.add('done');
+        else if (i === p) seg.classList.add('active');
+      });
+    }
+
+    function updateChapter(scene) {
+      if (scene.chapter) {
+        chapterTag.textContent = scene.chapter;
+      }
+    }
+
+    // 打字机效果
+    function typeWriter(element, html, callback) {
+      const temp = document.createElement('div');
+      temp.innerHTML = html;
+      let fullHTML = '';
+      temp.childNodes.forEach(n => { fullHTML += n.outerHTML || n.textContent; });
+
+      element.innerHTML = '';
+      let idx = 0;
+      const chars = fullHTML.split('');
+      let buffer = '';
+
+      function step() {
+        if (idx >= chars.length) {
+          element.innerHTML = fullHTML;
+          if (callback) callback();
+          return;
+        }
+
+        buffer += chars[idx];
+        element.innerHTML = buffer + '<span class="cursor"></span>';
+        idx++;
+
+        const last = chars[idx - 1];
+        let delay = 22;
+        if ('，。！？\n'.includes(last)) delay = 65;
+        if (last === '<') {
+          while (idx < chars.length && chars[idx] !== '>') {
+            buffer += chars[idx];
+            idx++;
+          }
+          if (idx < chars.length) {
+            buffer += chars[idx];
+            idx++;
+          }
+          element.innerHTML = buffer + '<span class="cursor"></span>';
+          step();
+          return;
+        }
+        setTimeout(step, delay);
+      }
+      step();
+    }
+
+    function renderScene(sceneId) {
+      const scene = GAME_DATA.scenes[sceneId];
+      if (!scene) return;
+
+      state.currentScene = sceneId;
+      updateProgress();
+      updateChapter(scene);
+
+      if (scene.ending) {
+        contentArea.innerHTML = `
+          <div class="ending-card">
+            <div class="badge">结局</div>
+            <h2>${scene.title}</h2>
+            <p>${scene.text.replace(/\n/g, '<br>')}</p>
+            <div class="quote">${scene.quote}</div>
+            <button class="restart-btn" onclick="restartGame()">重新开始</button>
+          </div>`;
+        return;
+      }
+
+      contentArea.innerHTML = `
+        <div class="scene-title">${scene.title}</div>
+        <div class="main-text" id="mainText"></div>
+        <div class="choices" id="choicesArea">
+          ${scene.choices.map((c, i) => `
+            <button class="choice-btn" data-next="${c.next}" style="opacity:0; transform:translateY(6px); transition:all 0.4s ease-out ${0.08 + i * 0.08}s;">
+              <span class="icon">${c.icon || '·'}</span>
+              <span class="text">${c.text}</span>
+            </button>`).join('')}
+        </div>`;
+
+      const mainText = document.getElementById('mainText');
+      typeWriter(mainText, scene.text.replace(/\n/g, '<br>'), () => {
+        document.querySelectorAll('.choice-btn').forEach(btn => {
+          btn.style.opacity = '1';
+          btn.style.transform = 'translateY(0)';
+        });
+      });
+
+      setTimeout(() => {
+        document.querySelectorAll('.choice-btn').forEach(btn => {
+          btn.addEventListener('click', function() {
+            const next = this.dataset.next;
+            if (next) {
+              contentArea.style.opacity = '0';
+              contentArea.style.transition = 'opacity 0.22s';
+              setTimeout(() => {
+                renderScene(next);
+                contentArea.style.opacity = '1';
+              }, 220);
+            }
+          });
+        });
+      }, 250);
+    }
+
+    window.restartGame = function() {
+      state.currentScene = 'start';
+      renderScene('start');
+    };
+
+    renderScene('start');
+  </script>
+</body>
+</html>
